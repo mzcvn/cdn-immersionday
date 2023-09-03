@@ -436,7 +436,7 @@ resource "aws_cloudfront_distribution" "api_gateway" {
         allowed_methods  = ["GET", "HEAD"]
         cached_methods   = ["GET", "HEAD"]
         target_origin_id = "get-stale-object"
-        cache_policy_id  = aws_cloudfront_cache_policy.get_stale_object.id
+        cache_policy_id  = var.test_stale_object ? aws_cloudfront_cache_policy.get_stale_object.id : "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
 
         viewer_protocol_policy = "allow-all"
         min_ttl                = 0

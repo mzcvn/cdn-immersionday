@@ -14,3 +14,7 @@ variable "cw_logs_lambda_edge_retention" {
   type    = number
   default = 7
 }
+
+variable "test_stale_object" {
+  type = bool
+}
