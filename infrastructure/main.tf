@@ -9,13 +9,13 @@ data "aws_iam_policy_document" "allow_access_from_cloudfront" {
       "s3:PutObject",
     ]
     resources = [
-      "arn:aws:s3:::${var.bucket_name}/*",
-      "arn:aws:s3:::${var.bucket_name}"
+      "arn:aws:s3:::${var.bucket_name}-${random_pet.this.id}/*",
+      "arn:aws:s3:::${var.bucket_name}-${random_pet.this.id}"
     ]
     condition {
-        test        = "StringEquals"
-        variable    = "AWS:SourceArn"
-        values      = [aws_cloudfront_distribution.s3_distribution.arn]
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.s3_distribution.arn]
     }
   }
 }
@@ -30,8 +30,8 @@ data "aws_iam_policy_document" "lambda_edge_permission" {
       "logs:PutLogEvents"
     ]
     resources = [
-      "arn:aws:s3:::${var.bucket_name}/*",
-      "arn:aws:s3:::${var.bucket_name}",
+      "arn:aws:s3:::${var.bucket_name}-${random_pet.this.id}/*",
+      "arn:aws:s3:::${var.bucket_name}-${random_pet.this.id}",
       "arn:aws:logs:*:*:*"
     ]
   }
@@ -55,27 +55,32 @@ data "aws_iam_policy_document" "lambda_edge_assume_role" {
 
 
 resource "aws_iam_policy" "lamda_edge_policy" {
-  name = "lambda-edge-policy"
+  name        = "lambda-edge-policy"
   description = "IAM policy for Lambda Edge to work with S3 bucket"
-  policy = data.aws_iam_policy_document.lambda_edge_permission.json
+  policy      = data.aws_iam_policy_document.lambda_edge_permission.json
 }
 
 resource "aws_iam_role_policy_attachment" "iam_role_policy_attachment" {
-  role = aws_iam_role.lambda_edge_role.name
+  role       = aws_iam_role.lambda_edge_role.name
   policy_arn = aws_iam_policy.lamda_edge_policy.arn
 }
 
 resource "aws_iam_role" "lambda_edge_role" {
-  name = "lambda_edge_role"
+  name               = "lambda_edge_role"
   assume_role_policy = data.aws_iam_policy_document.lambda_edge_assume_role.json
 }
 
 ##-------------------------------------##
 ##------------ S3 Origin -------------###
 ##-----------------------------------###
-
+resource "random_pet" "this" {
+  # keepers = {
+  #   # Generate a new pet name each time we switch to a new bucket name
+  #   bucket_name = var.bucket_name
+  # }
+}
 resource "aws_s3_bucket" "this" {
-  bucket = var.bucket_name
+  bucket = "${var.bucket_name}-${random_pet.this.id}"
 }
 resource "aws_s3_bucket_ownership_controls" "bucket_ownership" {
   bucket = aws_s3_bucket.this.id
@@ -107,21 +112,21 @@ resource "aws_s3_bucket_cors_configuration" "cors_rules" {
 
 //Define CloudFront function
 resource "aws_cloudfront_function" "img_optimization_function" {
-  name      = "image_optimization"
-  runtime   = "cloudfront-js-1.0"
-  publish   = true
-  code      = file("../cf_function/img_optimization.js")
+  name    = "image_optimization"
+  runtime = "cloudfront-js-1.0"
+  publish = true
+  code    = file("../cf_function/img_optimization.js")
 }
 
 //Define CloudFront Cache Policy
 resource "aws_cloudfront_cache_policy" "custom_cache" {
-    name    = "custom_cache"
-    comment = "cache policy to forward all query strings to origin"
-    default_ttl = 86400
-    max_ttl = 31536000
-    min_ttl = 1
+  name        = "custom_cache"
+  comment     = "cache policy to forward all query strings to origin"
+  default_ttl = 86400
+  max_ttl     = 31536000
+  min_ttl     = 1
 
-    parameters_in_cache_key_and_forwarded_to_origin {
+  parameters_in_cache_key_and_forwarded_to_origin {
     cookies_config {
       cookie_behavior = "none"
     }
@@ -132,7 +137,7 @@ resource "aws_cloudfront_cache_policy" "custom_cache" {
       query_string_behavior = "all"
 
     }
-  } 
+  }
 }
 
 ##--------------------------------------------##
@@ -140,12 +145,12 @@ resource "aws_cloudfront_cache_policy" "custom_cache" {
 ##-------------------------------------------###
 data "archive_file" "lambda" {
   type        = "zip"
-  source_dir = "../lambda/"
+  source_dir  = "../lambda/"
   output_path = "../function.zip"
 }
 
 resource "aws_lambda_function" "lambda_edge" {
-  provider = aws.lambda_edge
+  provider         = aws.lambda_edge
   function_name    = var.lambda_function_name
   role             = aws_iam_role.lambda_edge_role.arn
   filename         = "../function.zip"
@@ -153,12 +158,12 @@ resource "aws_lambda_function" "lambda_edge" {
   runtime          = "nodejs16.x"
   source_code_hash = data.archive_file.lambda.output_base64sha256
 
-  memory_size      = 1024
+  memory_size = 1024
   ephemeral_storage {
-    size           = 512
+    size = 512
   }
-  timeout          = 30
-  publish          = true
+  timeout = 30
+  publish = true
 }
 
 resource "aws_cloudwatch_log_group" "example" {
@@ -170,7 +175,7 @@ resource "aws_cloudwatch_log_group" "example" {
 ##### CloudFront Distribution (Prod) #####
 ##------------------------------------####
 locals {
-    s3_origin_id = "cdn-s3-origin"
+  s3_origin_id = aws_s3_bucket.this.id
 }
 
 resource "aws_cloudfront_origin_access_control" "this" {
@@ -182,61 +187,61 @@ resource "aws_cloudfront_origin_access_control" "this" {
 }
 
 resource "aws_cloudfront_distribution" "s3_distribution" {
-    enabled             = true
-    # retain_on_delete    = true
+  enabled = true
+  # retain_on_delete    = true
 
-    origin {
-        domain_name               = aws_s3_bucket.this.bucket_regional_domain_name
-        origin_access_control_id  = aws_cloudfront_origin_access_control.this.id
-        origin_id                 = local.s3_origin_id
-    }
-    custom_error_response {
-        error_caching_min_ttl = 10
-        error_code            = 403
-        response_code         = 403
-        response_page_path    = "/index.html"
-    }
-    default_cache_behavior {
-        allowed_methods  = ["GET", "HEAD"]
-        cached_methods   = ["GET", "HEAD"]
-        target_origin_id = local.s3_origin_id
-        cache_policy_id  = aws_cloudfront_cache_policy.custom_cache.id
+  origin {
+    domain_name              = aws_s3_bucket.this.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.this.id
+    origin_id                = local.s3_origin_id
+  }
+  custom_error_response {
+    error_caching_min_ttl = 10
+    error_code            = 403
+    response_code         = 403
+    response_page_path    = "/index.html"
+  }
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = local.s3_origin_id
+    cache_policy_id  = aws_cloudfront_cache_policy.custom_cache.id
 
-        viewer_protocol_policy = "allow-all"
-        min_ttl                = 0
-        default_ttl            = 0
-        max_ttl                = 0
+    viewer_protocol_policy = "allow-all"
+    min_ttl                = 0
+    default_ttl            = 0
+    max_ttl                = 0
 
-        lambda_function_association {
-          event_type = "origin-request"
-          lambda_arn = aws_lambda_function.lambda_edge.qualified_arn
-          include_body = true
-        }
-
-        function_association {
-          event_type = "viewer-request"
-          function_arn = aws_cloudfront_function.img_optimization_function.arn
-        }
-    }
-    
-    price_class = "PriceClass_200"
-
-    restrictions {
-        geo_restriction {
-        restriction_type = "none"
-        }
+    lambda_function_association {
+      event_type   = "origin-request"
+      lambda_arn   = aws_lambda_function.lambda_edge.qualified_arn
+      include_body = true
     }
 
-    tags = {
-        Environment = "production"
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.img_optimization_function.arn
     }
+  }
 
-    viewer_certificate {
-        cloudfront_default_certificate = true
+  price_class = "PriceClass_200"
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
     }
-    lifecycle {
-        create_before_destroy = true
-    }
+  }
+
+  tags = {
+    Environment = "production"
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 ##-------------------------------------##
@@ -245,7 +250,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
 
 data "archive_file" "lambda_stale_object" {
   type        = "zip"
-  source_dir = "../lambda_stale_object"
+  source_dir  = "../lambda_stale_object"
   output_path = "../stale_object.zip"
 }
 
@@ -257,12 +262,12 @@ resource "aws_lambda_function" "lambda_stale_object" {
   runtime          = "nodejs16.x"
   source_code_hash = data.archive_file.lambda_stale_object.output_base64sha256
 
-  memory_size      = 1024
+  memory_size = 1024
   ephemeral_storage {
-    size           = 512
+    size = 512
   }
-  timeout          = 30
-  publish          = true
+  timeout = 30
+  publish = true
 
   environment {
     variables = {
@@ -276,12 +281,15 @@ data "aws_iam_policy_document" "lambda_stale_object_permission" {
   statement {
     effect = "Allow"
     actions = [
+      "s3:*",
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
     resources = [
-      "arn:aws:logs:*:*:*"
+      "arn:aws:logs:*:*:*",
+      "arn:aws:s3:::${var.bucket_name}-${random_pet.this.id}/*",
+      "arn:aws:s3:::${var.bucket_name}-${random_pet.this.id}",
     ]
   }
 }
@@ -378,79 +386,84 @@ resource "aws_lambda_permission" "api_gw" {
 }
 
 resource "aws_cloudfront_cache_policy" "get_stale_object" {
-    name    = "get_stale_object"
-    comment = "cache policy to forward all query strings to origin"
-    default_ttl = 86400
-    max_ttl = 31536000
-    min_ttl = 1
+  name        = "get_stale_object"
+  comment     = "cache policy to forward all query strings to origin"
+  default_ttl = 86400
+  max_ttl     = 31536000
+  min_ttl     = 1
 
-    parameters_in_cache_key_and_forwarded_to_origin {
-      cookies_config {
-        cookie_behavior = "none"
-      }
-      headers_config {
-        header_behavior = "none"
-      }
-      query_strings_config {
-        query_string_behavior = "none"
-      }
-      enable_accept_encoding_brotli = false
-      enable_accept_encoding_gzip   = false
-  } 
+  parameters_in_cache_key_and_forwarded_to_origin {
+    cookies_config {
+      cookie_behavior = "none"
+    }
+    headers_config {
+      header_behavior = "none"
+    }
+    query_strings_config {
+      query_string_behavior = "none"
+    }
+    enable_accept_encoding_brotli = false
+    enable_accept_encoding_gzip   = false
+  }
 }
 
 resource "aws_cloudfront_distribution" "api_gateway" {
-    enabled             = true
-    # retain_on_delete    = true
+  depends_on = [
+    aws_s3_bucket.this,
+    aws_apigatewayv2_api.lambda_stale_object
+  ]
 
-    origin {
-      domain_name               = trim("${aws_apigatewayv2_api.lambda_stale_object.api_endpoint}", "https://")
-      origin_path               = "/prod"
-      origin_id                 = "get-stale-object"
-      
-      custom_origin_config {
-        http_port              = 80
-        https_port             = 443
-        origin_protocol_policy = "https-only"
-        origin_ssl_protocols   = ["TLSv1.2"]
-      }
+  enabled = true
+  # retain_on_delete    = true
+
+  origin {
+    domain_name = trim("${aws_apigatewayv2_api.lambda_stale_object.api_endpoint}", "https://")
+    origin_path = "/prod"
+    origin_id   = "get-stale-object"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
     }
+  }
 
 
-    custom_error_response {
-        error_caching_min_ttl = 10
-        error_code            = 403
-        response_code         = 403
-        response_page_path    = "/index.html"
-    }
-    default_cache_behavior {
-        allowed_methods  = ["GET", "HEAD"]
-        cached_methods   = ["GET", "HEAD"]
-        target_origin_id = "get-stale-object"
-        cache_policy_id  = aws_cloudfront_cache_policy.get_stale_object.id
+  custom_error_response {
+    error_caching_min_ttl = 10
+    error_code            = 403
+    response_code         = 403
+    response_page_path    = "/index.html"
+  }
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "get-stale-object"
+    cache_policy_id  = aws_cloudfront_cache_policy.get_stale_object.id
 
-        viewer_protocol_policy = "allow-all"
-        min_ttl                = 0
-        default_ttl            = 5
-        max_ttl                = 0
-    }
-    
-    price_class = "PriceClass_200"
+    viewer_protocol_policy = "allow-all"
+    min_ttl                = 0
+    default_ttl            = 5
+    max_ttl                = 0
+  }
 
-    restrictions {
-        geo_restriction {
-          restriction_type = "none"
-        }
-    }
+  price_class = "PriceClass_200"
 
-    tags = {
-        Environment = "production"
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
     }
+  }
 
-    viewer_certificate {
-        cloudfront_default_certificate = true
-    }
-    lifecycle {
-        create_before_destroy = true
-    }
+  tags = {
+    Environment = "production"
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
 }
