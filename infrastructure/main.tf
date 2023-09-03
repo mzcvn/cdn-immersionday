@@ -406,6 +406,14 @@ resource "aws_cloudfront_cache_policy" "get_stale_object" {
     enable_accept_encoding_gzip   = false
   }
 }
+#Create Response Headers policy with timing headers
+resource "aws_cloudfront_response_headers_policy" "timing_headers" {
+    name = "timing_headers"
+    server_timing_headers_config {
+      enabled = true
+      sampling_rate = 100
+    }
+}
 
 resource "aws_cloudfront_distribution" "api_gateway" {
   depends_on = [
@@ -428,8 +436,7 @@ resource "aws_cloudfront_distribution" "api_gateway" {
       origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
-
-
+  
   custom_error_response {
     error_caching_min_ttl = 10
     error_code            = 403
@@ -447,7 +454,7 @@ resource "aws_cloudfront_distribution" "api_gateway" {
     default_ttl            = 5
     max_ttl                = 0
   }
-
+  
   price_class = "PriceClass_200"
 
   restrictions {
