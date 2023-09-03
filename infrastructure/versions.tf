@@ -1,9 +1,10 @@
 terraform {
   required_version = ">= 1.4.5"
   backend "s3" {
-    bucket = "hungran20230903"
-    key    = "tfstate/terraform.tfstate"
-    region = "us-east-1"
+    bucket         = "cdn-tf-state"
+    key            = "tfstate/terraform.tfstate"
+    region         = "ap-southeast-1"
+    dynamodb_table = "cdn-tf-locks"
   }
   required_providers {
     aws = {
