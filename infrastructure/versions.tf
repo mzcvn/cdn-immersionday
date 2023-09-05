@@ -1,5 +1,5 @@
 terraform {
-  required_version = " ~> 1.4.5"
+  required_version = ">= 1.4.5"
   backend "s3" {
     bucket         = "cdn-tf-state"
     key            = "tfstate/terraform.tfstate"
@@ -10,6 +10,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.12.0"
+    }
+    random = {
+      source = "hashicorp/random"
+      version = ">= 3.5.1"
     }
   }
 }

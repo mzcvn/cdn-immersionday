@@ -5,3 +5,7 @@ provider "aws" {
   alias = "lambda_edge"
   region = "us-east-1"
 }
+
+provider "random" {
+  version = ">= 3.5.1"
+}
