@@ -416,6 +416,9 @@ resource "aws_cloudfront_response_headers_policy" "timing_headers" {
     }
 }
 
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
 resource "aws_cloudfront_distribution" "api_gateway" {
   depends_on = [
     aws_s3_bucket.this,
@@ -449,7 +452,7 @@ resource "aws_cloudfront_distribution" "api_gateway" {
     allowed_methods  = ["GET", "HEAD"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = aws_apigatewayv2_api.lambda_stale_object.id
-    cache_policy_id  = var.test_stale_object ? aws_cloudfront_cache_policy.get_stale_object.id : "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    cache_policy_id  = var.test_stale_object ? aws_cloudfront_cache_policy.get_stale_object.id : data.aws_cloudfront_cache_policy.caching_disabled.id
     
     viewer_protocol_policy = "allow-all"
     min_ttl                = 0
