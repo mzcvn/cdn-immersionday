@@ -81,6 +81,7 @@ resource "random_pet" "this" {
 }
 resource "aws_s3_bucket" "this" {
   bucket = "${var.bucket_name}-${random_pet.this.id}"
+  force_destroy = true
 }
 resource "aws_s3_bucket_ownership_controls" "bucket_ownership" {
   bucket = aws_s3_bucket.this.id
@@ -255,7 +256,7 @@ data "archive_file" "lambda_stale_object" {
 }
 
 resource "aws_lambda_function" "lambda_stale_object" {
-  function_name    = "lambda_stale_object"
+  function_name    = var.stale_object_lambda_function_name
   role             = aws_iam_role.lambda_stale_object_role.arn
   filename         = "../stale_object.zip"
   handler          = "index.handler"
@@ -326,7 +327,7 @@ resource "aws_iam_role" "lambda_stale_object_role" {
 }
 
 resource "aws_apigatewayv2_api" "lambda_stale_object" {
-  name          = "serverless_lambda_gw"
+  name          = "api_lambda_backend"
   protocol_type = "HTTP"
 }
 
@@ -427,13 +428,14 @@ resource "aws_cloudfront_distribution" "api_gateway" {
   origin {
     domain_name = trim("${aws_apigatewayv2_api.lambda_stale_object.api_endpoint}", "https://")
     origin_path = "/prod"
-    origin_id   = "get-stale-object"
+    origin_id   = aws_apigatewayv2_api.lambda_stale_object.id
 
     custom_origin_config {
       http_port              = 80
       https_port             = 443
       origin_protocol_policy = "https-only"
       origin_ssl_protocols   = ["TLSv1.2"]
+      origin_keepalive_timeout = 30
     }
   }
   
@@ -446,13 +448,15 @@ resource "aws_cloudfront_distribution" "api_gateway" {
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD"]
     cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "get-stale-object"
-    cache_policy_id  = aws_cloudfront_cache_policy.get_stale_object.id
-
+    target_origin_id = aws_apigatewayv2_api.lambda_stale_object.id
+    cache_policy_id  = var.test_stale_object ? aws_cloudfront_cache_policy.get_stale_object.id : "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    
     viewer_protocol_policy = "allow-all"
     min_ttl                = 0
     default_ttl            = 5
-    max_ttl                = 0
+    max_ttl                = 3600
+
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.timing_headers.id
   }
   
   price_class = "PriceClass_200"

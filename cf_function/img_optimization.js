@@ -5,7 +5,7 @@ function handler(event) {
         if ((request.headers['accept']) && (request.headers['accept'].value.includes("webp"))) {
             request.querystring.format.value = "webp";
         } else {
-            request.querystring.format.value = "png";
+            request.querystring.format.value = "jpeg";
         }
 
     }

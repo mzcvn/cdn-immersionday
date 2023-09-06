@@ -2,7 +2,7 @@ exports.handler = async (event) => {
   const response = {
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "max-age=86400,stale-while-revalidate=300,stale-if-error=100"
+      "Cache-Control": "max-age=8,stale-while-revalidate=300,stale-if-error=100"
       },
     "isBase64Encoded": false,
     "multiValueHeaders": { 
