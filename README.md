@@ -1,16 +1,16 @@
 # Leveraging the Power of CloudFront and Edge Computing
 
 This repository demonstrates 03 scenarios:
-- Scenario #1: Image optimization with CloudFront Function and Lambda@Edge.
-- Scenario #2: Stale-while-revalidate and stale-if-error cache control directives.
-- Scenario #3: Test persistent connections in CloudFront distribution with origin.
+- Scenario #1: Image optimization with CloudFront Function and Lambda@Edge (Fig.1).
+- Scenario #2: Stale-while-revalidate and stale-if-error cache control directives (Fig. 2).
+- Scenario #3: Test persistent connections in CloudFront distribution with origin (Fig. 2).
 
 ![Image optimization](image_optimization.png)
 <div align="center">Figure 1. Image optimization </div>
 </br></br>
 
-![Cache control](cache_control_directives.png)
-<div align="center">Figure 2. Cache control directives </div>
+![Cache control](cache_control.png)
+<div align="center">Figure 2. Cache control directives and Persistent connection </div>
 </br></br>
 
 # Usage
