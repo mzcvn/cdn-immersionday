@@ -73,6 +73,7 @@ for request_nr in range(0, requests_total):
     downstream_connect_time = round(c.getinfo(pycurl.CONNECT_TIME) * 1000, 1)
     namelookup_time = round(c.getinfo(pycurl.NAMELOOKUP_TIME) * 1000, 1)
     appconnect_time = round(c.getinfo(pycurl.APPCONNECT_TIME) * 1000, 1)
+    downstream_tcp_ssl_connect_time = downstream_connect_time + appconnect_time
     # pretransfer_time = round(c.getinfo(pycurl.PRETRANSFER_TIME) * 1000, 1)
     starttransfer_time = round(c.getinfo(pycurl.PRETRANSFER_TIME) * 1000, 1)
     download_speed = round(c.getinfo(pycurl.SPEED_DOWNLOAD) /125000, 1) #Mbps
@@ -104,13 +105,13 @@ for request_nr in range(0, requests_total):
         sys.exit()
 
     request_nr += 1
-    results.append([request_nr, total_time, namelookup_time, downstream_connect_time, appconnect_time, starttransfer_time,  upstream_connect_time, origin_fbl, cf_fbl, download_speed])
-
+    results.append([request_nr, total_time, namelookup_time, downstream_tcp_ssl_connect_time,  upstream_connect_time])
 
 print(tabulate(
     results,
     tablefmt='grid',
-    headers=["Request number", "Download time", "DNS resolution", "Downstream connect time", "Downstream TCP+SSL time", "User FBL", "Upstream TCP+SSL time", "Origin FBL", "CF FBL", "Download speed, Mbps"]
+    numalign='center',
+    headers=["Request number", "Download time (s)", "DNS resolution (s)", "Downstream TCP+SSL(s)", "Upstream Connect(DNS+TCP+SSL(s))"]
     )
 )
 
